@@ -1,0 +1,413 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fraction Slicer: The Halo Returns</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --accent: #38bdf8;
+            --gold: #fbbf24;
+            --gold-glow: rgba(251, 191, 36, 0.5);
+            --rose: #f43f5e;
+            --text: #f8fafc;
+            --muted: #475569;
+            --success: #22c55e;
+        }
+
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--bg); color: var(--text);
+            display: flex; justify-content: center; padding: 20px; margin: 0;
+        }
+
+
+        #game-container {
+            background: var(--card); padding: 2rem; border-radius: 32px;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.6); width: 100%; max-width: 1000px;
+            border: 1px solid #334155;
+        }
+
+
+        .math-stage {
+            display: flex; flex-direction: column; align-items: center; gap: 5px; margin-bottom: 25px;
+        }
+
+
+        .equation-row {
+            display: flex; align-items: center; justify-content: center; gap: 15px;
+        }
+
+
+        .fraction-column {
+            display: flex; flex-direction: column; align-items: center; width: 120px;
+        }
+
+
+        /* Fraction Elements */
+        .frac-box {
+            display: flex; flex-direction: column; align-items: center; position: relative; padding: 10px 0;
+        }
+        .num { border-bottom: 3px solid var(--text); padding: 2px 10px; font-size: 2.2rem; width: 65px; text-align: center; line-height: 1.1; z-index: 2; }
+        .den { padding: 2px 10px; font-size: 2.2rem; width: 65px; text-align: center; line-height: 1.1; position: relative; z-index: 2; }
+
+
+        /* THE HALO ANIMATION */
+        .halo {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 80px; height: 80px;
+            background: var(--gold-glow);
+            border: 2px solid var(--gold);
+            border-radius: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .halo-pulse {
+            animation: halo-pop 0.8s ease-out;
+        }
+        @keyframes halo-pop {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.8; }
+            100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+        }
+
+
+        .source-frac { opacity: 0.4; transform: scale(0.9); }
+        .scaled-1 { color: var(--rose); }
+        .scaled-2 { color: var(--accent); }
+        .is-matched { color: var(--gold) !important; transition: color 0.3s; }
+
+
+        /* Operators */
+        .op-box {
+            font-size: 1.8rem; font-weight: 900; background: rgba(255,255,255,0.05);
+            width: 44px; height: 44px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .arrow-v { color: var(--muted); font-size: 1.8rem; font-weight: 900; height: 30px; display: flex; align-items: center; }
+
+
+        /* Inputs */
+        .input-group { display: flex; flex-direction: column; align-items: center; }
+        .fraction-input {
+            background: #0f172a; border: 3px solid var(--gold); color: var(--gold);
+            width: 80px; text-align: center; font-size: 2rem; border-radius: 12px; padding: 5px; outline: none;
+        }
+        .fraction-input.error { border-color: var(--rose); animation: shake 0.4s; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-4px); } 60% { transform: translateX(4px); } }
+
+
+        /* Badges */
+        .mult-badge {
+            position: absolute; right: -15px; color: var(--gold); font-weight: 900; font-size: 0.9rem;
+            opacity: 0; transition: 0.2s;
+        }
+        .mult-badge.active { opacity: 1; transform: translateX(5px); }
+
+
+        /* Simplify Reveal */
+        #simplify-section {
+            display: flex; align-items: center; gap: 15px; opacity: 0;
+            transform: translateX(-20px); transition: all 0.5s ease; pointer-events: none;
+        }
+        #simplify-section.visible { opacity: 1; transform: translateX(0); pointer-events: auto; }
+        .simplify-label { font-size: 0.75rem; color: var(--accent); font-weight: 800; margin-bottom: 5px; text-transform: uppercase; }
+
+
+        #feedback-box {
+            min-height: 60px; margin: 20px 0; padding: 15px; border-radius: 16px; font-weight: 600; text-align: center;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .feedback-error { background: rgba(244, 63, 94, 0.1); color: #fda4af; border: 1px solid var(--rose); }
+        .feedback-oops { background: rgba(251, 191, 36, 0.1); color: var(--gold); border: 2px dashed var(--gold); }
+        .feedback-info { background: rgba(34, 197, 94, 0.1); color: var(--success); border: 1px solid var(--success); }
+
+
+        .visual-box {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #334155;
+        }
+        .bar-container { height: 24px; width: 100%; background: #334155; border-radius: 6px; position: relative; overflow: hidden; margin-bottom: 10px; }
+        .fill { height: 100%; position: absolute; left: 0; transition: width 0.3s; }
+        #fill1 { background: var(--rose); }
+        #fill2 { background: var(--accent); }
+
+
+        .btn-container { text-align: center; margin-top: 20px; }
+        #submit-btn {
+            background: var(--gold); color: #000; border: none; padding: 18px 60px;
+            border-radius: 16px; font-weight: 900; cursor: pointer; font-size: 1.2rem;
+        }
+        #submit-btn.correct { background: var(--success); color: white; }
+    </style>
+</head>
+<body>
+
+
+<div id="game-container">
+    <div style="display:flex; justify-content:space-between; color:var(--accent); font-weight:800; margin-bottom: 20px;">
+        <span>LEVEL <span id="level-val">1</span></span>
+        <span>SCORE <span id="score-val">0</span></span>
+    </div>
+
+
+    <div class="math-stage">
+        <div class="equation-row">
+            <div class="fraction-column">
+                <div class="frac-box source-frac">
+                    <span class="mult-badge" style="top:5px" id="b-t1"></span>
+                    <div class="num" id="n1">1</div>
+                    <div class="den" id="d1">2</div>
+                    <span class="mult-badge" style="bottom:5px" id="b-b1"></span>
+                </div>
+            </div>
+            <div style="width:44px; display:flex; justify-content:center;">
+                <div class="op-box source-frac" id="src-op">+</div>
+            </div>
+            <div class="fraction-column">
+                <div class="frac-box source-frac">
+                    <span class="mult-badge" style="top:5px" id="b-t2"></span>
+                    <div class="num" id="n2">1</div>
+                    <div class="den" id="d2">3</div>
+                    <span class="mult-badge" style="bottom:5px" id="b-b2"></span>
+                </div>
+            </div>
+            <div style="width: 250px;"></div>
+        </div>
+
+
+        <div class="equation-row" style="margin: -5px 0;">
+            <div class="fraction-column"><div class="arrow-v">↓</div></div>
+            <div style="width:44px;"></div>
+            <div class="fraction-column"><div class="arrow-v">↓</div></div>
+            <div style="width: 250px;"></div>
+        </div>
+
+
+        <div class="equation-row">
+            <div class="fraction-column">
+                <div class="frac-box scaled-1">
+                    <div class="num" id="sn1">1</div>
+                    <div class="den" id="sd1">2<div class="halo" id="h1"></div></div>
+                </div>
+            </div>
+            <div style="width:44px; display:flex; justify-content:center;">
+                <div class="op-box" id="wrk-op">+</div>
+            </div>
+            <div class="fraction-column">
+                <div class="frac-box scaled-2">
+                    <div class="num" id="sn2">1</div>
+                    <div class="den" id="sd2">3<div class="halo" id="h2"></div></div>
+                </div>
+            </div>
+            <div style="font-size: 2.5rem; font-weight: 900; margin: 0 10px;">=</div>
+            <div class="input-group">
+                <input type="number" id="ans-num" class="fraction-input" placeholder="?">
+                <div style="width:70%; height:4px; background:white; margin:8px 0;"></div>
+                <input type="number" id="ans-den" class="fraction-input" placeholder="?">
+            </div>
+            <div id="simplify-section">
+                <div style="font-size: 2rem; color: var(--muted); font-weight: 900;">→</div>
+                <div class="input-group">
+                    <div class="simplify-label">Simplify!</div>
+                    <input type="number" id="sim-num" class="fraction-input" placeholder="?">
+                    <div style="width:70%; height:4px; background:white; margin:8px 0;"></div>
+                    <input type="number" id="sim-den" class="fraction-input" placeholder="?">
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="visual-box">
+        <div>
+            <div class="bar-container"><div id="fill1" class="fill"></div><div id="grid1"></div></div>
+            <input type="range" id="slice1" min="1" max="10" value="1" style="width:100%">
+        </div>
+        <div>
+            <div class="bar-container"><div id="fill2" class="fill"></div><div id="grid2"></div></div>
+            <input type="range" id="slice2" min="1" max="10" value="1" style="width:100%">
+        </div>
+    </div>
+    <div id="feedback-box">Match the denominators first!</div>
+    <div class="btn-container"><button id="submit-btn" onclick="handleButtonClick()">Check Solution (Enter)</button></div>
+</div>
+
+
+<script>
+    let state = { level: 1, score: 0, n1: 1, d1: 2, n2: 1, d2: 3, op: '+', solved: false, simplified: false, targetNum: 0, targetDen: 0, wasMatched: false };
+
+
+    function getGCD(a, b) { return b === 0 ? Math.abs(a) : getGCD(b, a % b); }
+
+
+    function initLevel() {
+        state.solved = false; state.simplified = false; state.wasMatched = false;
+        document.getElementById('submit-btn').innerText = "Check Solution (Enter)";
+        document.getElementById('submit-btn').className = "";
+        document.getElementById('simplify-section').classList.remove('visible');
+        showFeedback("Use the sliders to find a common denominator.", "info");
+        
+        const dens = [2, 3, 4, 5, 6, 8, 10];
+        state.d1 = dens[Math.floor(Math.random() * 4)];
+        state.d2 = dens[Math.floor(Math.random() * 4)];
+        while(state.d1 === state.d2) state.d2 = dens[Math.floor(Math.random() * 5)];
+        state.n1 = Math.floor(Math.random() * (state.d1 - 1)) + 1;
+        state.n2 = Math.floor(Math.random() * (state.d2 - 1)) + 1;
+        state.op = Math.random() > 0.5 ? '+' : '-';
+        if(state.op === '-' && (state.n1/state.d1 < state.n2/state.d2)) {
+            [state.n1, state.n2] = [state.n2, state.n1]; [state.d1, state.d2] = [state.d2, state.d1];
+        }
+        const rawN = state.op === '+' ? (state.n1*state.d2 + state.n2*state.d1) : (state.n1*state.d2 - state.n2*state.d1);
+        const rawD = state.d1 * state.d2;
+        const finalGCD = getGCD(rawN, rawD);
+        state.targetNum = rawN / finalGCD; state.targetDen = rawD / finalGCD;
+
+
+        document.getElementById('n1').innerText = state.n1; document.getElementById('d1').innerText = state.d1;
+        document.getElementById('n2').innerText = state.n2; document.getElementById('d2').innerText = state.d2;
+        document.getElementById('src-op').innerText = state.op; document.getElementById('wrk-op').innerText = state.op;
+        document.getElementById('slice1').value = 1; document.getElementById('slice2').value = 1;
+        document.getElementById('ans-num').value = ''; document.getElementById('ans-den').value = '';
+        document.getElementById('sim-num').value = ''; document.getElementById('sim-den').value = '';
+        updateGame();
+    }
+
+
+    function updateGame() {
+        const s1 = parseInt(document.getElementById('slice1').value);
+        const s2 = parseInt(document.getElementById('slice2').value);
+        const curD1 = state.d1 * s1; const curD2 = state.d2 * s2;
+
+
+        document.getElementById('sn1').innerText = state.n1 * s1;
+        document.getElementById('sn2').innerText = state.n2 * s2;
+        document.getElementById('sd1').childNodes[0].nodeValue = curD1;
+        document.getElementById('sd2').childNodes[0].nodeValue = curD2;
+
+
+        const isMatched = (curD1 === curD2);
+        document.getElementById('sd1').classList.toggle('is-matched', isMatched);
+        document.getElementById('sd2').classList.toggle('is-matched', isMatched);
+
+
+        if (isMatched && !state.wasMatched) {
+            triggerHalo();
+            state.wasMatched = true;
+        } else if (!isMatched) {
+            state.wasMatched = false;
+        }
+
+
+        updateBadge('b-t1', 'b-b1', s1); updateBadge('b-t2', 'b-b2', s2);
+        document.getElementById('fill1').style.width = (state.n1/state.d1*100) + "%";
+        document.getElementById('fill2').style.width = (state.n2/state.d2*100) + "%";
+        renderGrid('grid1', curD1); renderGrid('grid2', curD2);
+    }
+
+
+    function triggerHalo() {
+        const h1 = document.getElementById('h1'), h2 = document.getElementById('h2');
+        h1.classList.remove('halo-pulse'); h2.classList.remove('halo-pulse');
+        void h1.offsetWidth;
+        h1.classList.add('halo-pulse'); h2.classList.add('halo-pulse');
+    }
+
+
+    function updateBadge(tId, bId, mult) {
+        const t = document.getElementById(tId), b = document.getElementById(bId);
+        if (mult > 1) { t.innerText = `×${mult}`; b.innerText = `×${mult}`; t.classList.add('active'); b.classList.add('active'); }
+        else { t.classList.remove('active'); b.classList.remove('active'); }
+    }
+
+
+    function showFeedback(msg, type = "error") {
+        const box = document.getElementById('feedback-box'); box.innerText = msg; box.className = "";
+        if (type === "error") box.classList.add('feedback-error');
+        else if (type === "oops") box.classList.add('feedback-oops');
+        else if (type === "info") box.classList.add('feedback-info');
+    }
+
+
+    function checkAnswer() {
+        const uNum = parseInt(document.getElementById('ans-num').value);
+        const uDen = parseInt(document.getElementById('ans-den').value);
+        
+        if (isNaN(uNum) || isNaN(uDen)) return;
+
+
+        // 1. Validate if the denominator is a valid common denominator
+        const isValidDen = (uDen % state.d1 === 0) && (uDen % state.d2 === 0);
+        
+        if (!isValidDen) {
+            showFeedback(`The denominator ${uDen} isn't a common multiple of ${state.d1} and ${state.d2}.`, "error");
+            document.getElementById('ans-den').classList.add('error');
+            return;
+        }
+
+
+        // 2. Check the mathematical value
+        const correctVal = state.op === '+' ? (state.n1/state.d1 + state.n2/state.d2) : (state.n1/state.d1 - state.n2/state.d2);
+        const userVal = uNum / uDen;
+
+
+        if (Math.abs(userVal - correctVal) < 0.0001) {
+            // Success! Synchronize the sliders for visual consistency
+            document.getElementById('slice1').value = uDen / state.d1;
+            document.getElementById('slice2').value = uDen / state.d2;
+            updateGame();
+
+
+            if (getGCD(uNum, uDen) === 1) {
+                winLevel();
+            } else { 
+                state.solved = true; 
+                document.getElementById('simplify-section').classList.add('visible'); 
+                showFeedback("Correct! Now simplify it.", "oops"); 
+            }
+        } else { 
+            showFeedback("The value is incorrect. Check your numerator math!", "error"); 
+            document.getElementById('ans-num').classList.add('error'); 
+        }
+    }
+
+
+    function checkSimplified() {
+        const sN = parseInt(document.getElementById('sim-num').value), sD = parseInt(document.getElementById('sim-den').value);
+        if (sN === state.targetNum && sD === state.targetDen) winLevel();
+        else { showFeedback("Not simplified enough. Try simplify some more!", "error"); document.getElementById('sim-num').classList.add('error'); }
+    }
+
+
+    function winLevel() {
+        state.simplified = true; document.getElementById('submit-btn').innerText = "SUCCESS! NEXT LEVEL";
+        document.getElementById('submit-btn').className = "correct"; showFeedback("Ka pai!", "info");
+        state.score += 150; state.level++; document.getElementById('score-val').innerText = state.score; document.getElementById('level-val').innerText = state.level;
+    }
+
+
+    function renderGrid(id, count) {
+        const container = document.getElementById(id); container.innerHTML = '';
+        for(let i = 1; i < count; i++) {
+            const line = document.createElement('div');
+            line.style.cssText = `position:absolute; top:0; bottom:0; width:1px; background:rgba(255,255,255,0.15); left:${(i/count*100)}%`;
+            container.appendChild(line);
+        }
+    }
+
+
+    function handleButtonClick() { if (state.simplified) initLevel(); else if (state.solved) checkSimplified(); else checkAnswer(); }
+
+
+    window.addEventListener('keydown', (e) => { if(e.key === 'Enter') handleButtonClick(); });
+    document.getElementById('slice1').addEventListener('input', updateGame);
+    document.getElementById('slice2').addEventListener('input', updateGame);
+    initLevel();
+</script>
+</body>
+</html>
